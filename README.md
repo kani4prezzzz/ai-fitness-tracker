@@ -45,7 +45,7 @@ A full-stack fitness tracking application built to help users record workouts, m
 5. Start the application:
      uvicorn main:app --reload
 
-6. Open http://127.0.0.1:8000 in your browser.
+6. Open http://127.0.0.1:8000/frontend/index.html in your browser to view the dashboard.
 
 ## Security
 
@@ -54,3 +54,7 @@ Store API keys and other secrets in environment variables. Never commit your `.e
 ## Author
 
 Kani Smith
+
+## Dashboard Preview
+
+[AI Fitness Tracker Dashboard](fitness-dashboard.png)
