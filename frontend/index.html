@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fitness Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>AI Fitness Tracker</h1>
+        <p>Your workouts. Your progress. Your data.</p>
+    </header>
+
+    <main>
+
+        <!-- Login Section -->
+        <section class="login-section">
+
+            <h2>Login</h2>
+
+            <input
+                type="text"
+                id="username"
+                placeholder="Username"
+            >
+
+            <input
+                type="password"
+                id="password"
+                placeholder="Password"
+            >
+
+            <button id="login-button">
+                Login
+            </button>
+
+            <p id="login-message"></p>
+
+        </section>
+
+        <!-- Dashboard Section -->
+        <section class="dashboard" id="dashboard">
+
+            <section class="welcome">
+                <h2>Welcome to your dashboard 👋</h2>
+                <p>Track your workouts and monitor your progress.</p>
+            </section>
+
+            <!-- Statistics -->
+            <section class="stats">
+
+                <div class="card">
+                    <h3>Workouts</h3>
+                    <p id="workout-count">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Total Sets</h3>
+                    <p id="total-sets">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Total Reps</h3>
+                    <p id="total-reps">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Total Volume</h3>
+                    <p id="total-volume">0 lbs</p>
+                </div>
+
+            </section>
+
+            <!-- Add Workout -->
+            <section class="add-workout">
+
+                <h2>Add Workout</h2>
+
+                <input
+                    type="text"
+                    id="exercise"
+                    placeholder="Exercise"
+
+                 >
+
+                 <label for="workout-date">Workout Date:</label>
+                <input
+                    type="date"
+                    id="workout-date"
+            >
+
+                <input
+                    type="number"
+                    id="sets"
+                    placeholder="Sets"
+                    min="1"
+                >
+
+                <input
+                    type="number"
+                    id="reps"
+                    placeholder="Reps"
+                    min="1"
+                >
+
+                <input
+                    type="number"
+                    id="weight"
+                    placeholder="Weight (lbs)"
+                    min="0"
+                    step="0.1"
+                >
+
+                <button 
+                    id="add-workout-button"
+                    onclick="addWorkout()"
+                >
+                    Add Workout
+                </button>
+
+                <p id="workout-message"></p>
+
+            </section>
+
+            <!-- Progress -->
+            <section class="progress-section">
+
+            <h2>Progress</h2>
+
+            <p>
+                Choose an exercise to view your progress.
+            </p>
+
+            <select id="exercise-select">
+                <option value="">Select an exercise</option>
+            </select>
+
+            <canvas id="progress-chart"></canvas>
+
+            </section>
+
+            <!-- Workout Calendar -->
+            <section class="calendar-section">
+
+                <h2>Workout Calendar</h2>
+
+                <div class="calendar-header">
+                <button id="prev-month" type="button">
+                     &lt; Prev
+                </button>
+
+                <h3 id="calendar-month-label"></h3>
+
+                <button id="next-month" type="button">
+                    Next &gt;
+                </button>
+            </div>
+
+            <div class="calendar-weekdays">
+                <span>Sun</span>
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span>Sat</span>
+            </div>
+
+            <div id="calendar-grid" class="calendar-grid"></div>
+
+            <p>Select a date to see your workouts.</p>
+
+            <input type="date" id="calendar-date">
+
+            <div id="calendar-workouts">
+                <p>Select a date to view workouts.</p>
+            </div>
+
+        </section>
+
+
+            <!-- Recent Workouts -->
+            <section class="workouts">
+
+                <h2>Recent Workouts</h2>
+
+                <div id="workout-list">
+                    <p>Loading workouts...</p>
+                </div>
+
+            </section>
+
+            <!-- AI Coach -->
+            <section class="ai-section">
+
+                <h2>🤖 AI Coach</h2>
+
+                <button id="ai-button">
+                    Get Recommendation
+                </button>
+
+                <div id="ai-result">
+                    <p>Your recommendation will appear here.</p>
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
