@@ -29,6 +29,10 @@ pwd_context = CryptContext(
 )
 
 SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is missing. Check your .env file.")
+
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -158,10 +162,10 @@ def create_user(user: UserCreate, db=Depends(get_db)):
     }
 
 class Workout(BaseModel):
-    exercise: str
-    sets: int
-    reps: int
-    weight: float
+    exercise: str = Field(min_length=1, max_length=100)
+    sets: int = Field(ge=1)
+    reps: int = Field(ge=1)
+    weight: float = Field(ge=0)
     workout_date: date | None = None
 
 class WorkoutResponse(BaseModel):
