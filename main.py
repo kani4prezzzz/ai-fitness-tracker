@@ -3,8 +3,10 @@ import os
 
 load_dotenv()
 
+from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import FileResponse 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -18,6 +20,8 @@ from datetime import date, datetime, timezone, timedelta
 from ai_service import generate_ai_recommendation
 
 app = FastAPI()
+
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
