@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from database import engine, Base, SessionLocal
 import models
 from passlib.context import CryptContext
@@ -79,7 +79,7 @@ def get_current_user(
     
 class UserCreate(BaseModel):
     username: str
-    password: str
+    password: str = Field(min_length=12, max_length=72)
 
 class LoginRequest(BaseModel):
     username: str
@@ -131,6 +131,16 @@ def login(
 
 @app.post("/users")
 def create_user(user: UserCreate, db=Depends(get_db)):
+    existing_user = db.query(models.User).filter(
+        models.User.username == user.username
+    ).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=409,
+            detail="Username already exists"
+        )
+
     password_hash = pwd_context.hash(user.password)
 
     db_user = models.User(
