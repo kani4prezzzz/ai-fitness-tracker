@@ -109,9 +109,11 @@ def login(
             detail="Invalid username or password"
         )
 
+    
     token_data = {
         "sub": str(db_user.id),
-        "username": db_user.username
+        "username": db_user.username,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=60)
     }
 
     token = jwt.encode(
@@ -119,6 +121,7 @@ def login(
         SECRET_KEY,
         algorithm=ALGORITHM
     )
+
 
     return {
         "access_token": token,
