@@ -32,8 +32,8 @@ A full-stack fitness tracking application built to help users record workouts, m
 
 1. Clone the repository:
    
-     git clone https://github.com/kani4prezzzz/ai-fitness-tracker.git
-     cd ai-fitness-tracker
+   git clone https://github.com/kani4prezzzz/ai-fitness-tracker.git
+   cd ai-fitness-tracker
    
 2. Create and activate a Python virtual environment.
 
@@ -57,4 +57,4 @@ Kani Smith
 
 ## Dashboard Preview
 
-[AI Fitness Tracker Dashboard](fitness-dashboard.png)
+![AI Fitness Tracker Dashboard](fitness-dashboard.png)
