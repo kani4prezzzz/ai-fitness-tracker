@@ -174,3 +174,147 @@ def test_users_cannot_access_each_others_workouts():
     )
     assert owner_response.status_code == 200
     assert owner_response.json()["exercise"] == "Sprint"
+
+def test_workout_history_only_shows_current_users_workouts():
+    # Register two separate users.
+    client.post(
+        "/users",
+        json={"username": "alice", "password": "StrongPass123"},
+    )
+    client.post(
+        "/users",
+        json={"username": "bob", "password": "StrongPass123"},
+    )
+
+    # Log in as Alice and Bob.
+    alice_login = client.post(
+        "/login",
+        data={"username": "alice", "password": "StrongPass123"},
+    )
+    bob_login = client.post(
+        "/login",
+        data={"username": "bob", "password": "StrongPass123"},
+    )
+
+    alice_token = alice_login.json()["access_token"]
+    bob_token = bob_login.json()["access_token"]
+
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    # Each user creates a workout.
+    client.post(
+        "/workouts",
+        json={
+            "exercise": "Alice Sprint",
+            "sets": 4,
+            "reps": 6,
+            "weight": 100,
+        },
+        headers=alice_headers,
+    )
+
+    client.post(
+        "/workouts",
+        json={
+            "exercise": "Bob Squat",
+            "sets": 3,
+            "reps": 8,
+            "weight": 150,
+        },
+        headers=bob_headers,
+    )
+
+    # Retrieve each user's workout history.
+    alice_history = client.get(
+        "/workouts/history",
+        headers=alice_headers,
+    )
+    bob_history = client.get(
+        "/workouts/history",
+        headers=bob_headers,
+    )
+
+    # Verify each user sees only their own workout.
+    assert alice_history.status_code == 200
+    assert [w["exercise"] for w in alice_history.json()] == ["Alice Sprint"]
+
+    assert bob_history.status_code == 200
+    assert [w["exercise"] for w in bob_history.json()] == ["Bob Squat"]
+
+def test_weekly_analytics_only_counts_current_users_workouts():
+    # Register two separate users.
+    client.post(
+        "/users",
+        json={"username": "alice", "password": "StrongPass123"},
+    )
+    client.post(
+        "/users",
+        json={"username": "bob", "password": "StrongPass123"},
+    )
+
+    # Log in as Alice and Bob.
+    alice_login = client.post(
+        "/login",
+        data={"username": "alice", "password": "StrongPass123"},
+    )
+    bob_login = client.post(
+        "/login",
+        data={"username": "bob", "password": "StrongPass123"},
+    )
+
+    alice_headers = {
+        "Authorization": f"Bearer {alice_login.json()['access_token']}"
+    }
+    bob_headers = {
+        "Authorization": f"Bearer {bob_login.json()['access_token']}"
+    }
+
+    # Each user creates a workout.
+    client.post(
+        "/workouts",
+        json={
+            "exercise": "Alice Sprint",
+            "sets": 4,
+            "reps": 6,
+            "weight": 100,
+        },
+        headers=alice_headers,
+    )
+
+    client.post(
+        "/workouts",
+        json={
+            "exercise": "Bob Squat",
+            "sets": 3,
+            "reps": 8,
+            "weight": 150,
+        },
+        headers=bob_headers,
+    )
+
+    # Request weekly analytics for each user.
+    alice_response = client.get(
+        "/workout/analytics/weekly",
+        headers=alice_headers,
+    )
+    bob_response = client.get(
+        "/workout/analytics/weekly",
+        headers=bob_headers,
+    )
+
+    # Confirm Alice's statistics include only her workout.
+    assert alice_response.status_code == 200
+    assert alice_response.json()["workout_count"] == 1
+    assert alice_response.json()["total_sets"] == 4
+    assert alice_response.json()["total_reps"] == 6
+    assert alice_response.json()["total_volume"] == 2400
+    assert alice_response.json()["most_trained_exercise"] == "Alice Sprint"
+
+    # Confirm Bob's statistics include only his workout.
+    assert bob_response.status_code == 200
+    assert bob_response.json()["workout_count"] == 1
+    assert bob_response.json()["total_sets"] == 3
+    assert bob_response.json()["total_reps"] == 8
+    assert bob_response.json()["total_volume"] == 3600
+    assert bob_response.json()["most_trained_exercise"] == "Bob Squat"
