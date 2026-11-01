@@ -89,6 +89,9 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class WeeklyGoalUpdate(BaseModel):
+    weekly_goal: int = Field(ge=1, le=7)
+
 @app.post("/login")
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -371,6 +374,60 @@ def get_weekly_analytics(
         "total_reps": total_reps,
         "total_volume": total_volume,
         "most_trained_exercise": most_trained_exercise
+    }
+
+@app.put("/goals/weekly")
+def update_weekly_goal(
+    goal: WeeklyGoalUpdate,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    current_user.weekly_goal = goal.weekly_goal
+
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "message": "Weekly goal updated successfully",
+        "weekly_goal": current_user.weekly_goal
+    }
+
+@app.get("/goals/weekly")
+def get_weekly_goal_progress(
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    today = datetime.now(timezone.utc).date()
+
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    workouts = db.query(models.Workout).filter(
+        models.Workout.user_id == current_user.id,
+        models.Workout.workout_date >= week_start,
+        models.Workout.workout_date <= week_end
+    ).all()
+
+    completed_days = len({
+        workout.workout_date for workout in workouts
+    })
+
+    remaining_days = max(
+        current_user.weekly_goal - completed_days, 0
+    )
+
+    progress_percentage = min(
+        round((completed_days / current_user.weekly_goal) * 100),
+        100
+    )
+
+    return {
+        "weekly_goal": current_user.weekly_goal,
+        "completed_days": completed_days,
+        "remaining_days": remaining_days,
+        "progress_percentage": progress_percentage,
+        "week_start": week_start,
+        "week_end": week_end
     }
 
 @app.get("/ai/recommendation")

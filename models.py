@@ -48,6 +48,12 @@ class User(Base):
         nullable=False
     )
 
+    weekly_goal: Mapped[int] = mapped_column(
+    Integer,
+    default=4,
+    nullable=False
+    )
+
     workouts: Mapped[list["Workout"]] = relationship(
         back_populates="user"
     )

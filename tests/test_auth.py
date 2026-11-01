@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from datetime import datetime, timedelta, timezone
 
 import models
 from database import Base
@@ -318,3 +319,189 @@ def test_weekly_analytics_only_counts_current_users_workouts():
     assert bob_response.json()["total_reps"] == 8
     assert bob_response.json()["total_volume"] == 3600
     assert bob_response.json()["most_trained_exercise"] == "Bob Squat"
+
+def test_user_can_update_weekly_goal():
+    # Register a user.
+    client.post(
+        "/users",
+        json={
+            "username": "goaluser",
+            "password": "StrongPass123",
+        },
+    )
+
+    # Log in.
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "goaluser",
+            "password": "StrongPass123",
+        },
+    )
+
+    token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Update the weekly goal to 5 days.
+    response = client.put(
+        "/goals/weekly",
+        json={"weekly_goal": 5},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["weekly_goal"] == 5
+
+def test_weekly_goal_rejects_invalid_value():
+    # Register a user.
+    client.post(
+        "/users",
+        json={
+            "username": "invalidgoal",
+            "password": "StrongPass123",
+        },
+    )
+
+    # Log in.
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "invalidgoal",
+            "password": "StrongPass123",
+        },
+    )
+
+    token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Try to set a goal above the maximum of 7 days.
+    response = client.put(
+        "/goals/weekly",
+        json={"weekly_goal": 8},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+def test_weekly_goal_counts_unique_workout_days():
+    # Register a user.
+    client.post(
+        "/users",
+        json={
+            "username": "daycounter",
+            "password": "StrongPass123",
+        },
+    )
+
+    # Log in.
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "daycounter",
+            "password": "StrongPass123",
+        },
+    )
+
+    token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Calculate Monday and Tuesday of the current week.
+    today = datetime.now(timezone.utc).date()
+    monday = today - timedelta(days=today.weekday())
+    tuesday = monday + timedelta(days=1)
+
+    # Log two exercises on Monday.
+    for exercise in ["Squat", "Bench Press"]:
+        client.post(
+            "/workouts",
+            json={
+                "exercise": exercise,
+                "sets": 3,
+                "reps": 10,
+                "weight": 100,
+                "workout_date": monday.isoformat(),
+            },
+            headers=headers,
+        )
+
+    # Log one exercise on Tuesday.
+    client.post(
+        "/workouts",
+        json={
+            "exercise": "Deadlift",
+            "sets": 3,
+            "reps": 5,
+            "weight": 150,
+            "workout_date": tuesday.isoformat(),
+        },
+        headers=headers,
+    )
+
+    # Check weekly progress.
+    response = client.get(
+        "/goals/weekly",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["completed_days"] == 2
+
+def test_weekly_goal_progress_is_user_specific():
+    # Register two users.
+    for username in ["alice", "bob"]:
+        client.post(
+            "/users",
+            json={
+                "username": username,
+                "password": "StrongPass123",
+            },
+        )
+
+    # Log in as Alice.
+    alice_login = client.post(
+        "/login",
+        data={
+            "username": "alice",
+            "password": "StrongPass123",
+        },
+    )
+    alice_token = alice_login.json()["access_token"]
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+
+    # Alice logs a workout.
+    client.post(
+        "/workouts",
+        json={
+            "exercise": "Squat",
+            "sets": 3,
+            "reps": 10,
+            "weight": 100,
+        },
+        headers=alice_headers,
+    )
+
+    # Log in as Bob.
+    bob_login = client.post(
+        "/login",
+        data={
+            "username": "bob",
+            "password": "StrongPass123",
+        },
+    )
+    bob_token = bob_login.json()["access_token"]
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    # Check each user's weekly progress.
+    alice_progress = client.get(
+        "/goals/weekly",
+        headers=alice_headers,
+    )
+    bob_progress = client.get(
+        "/goals/weekly",
+        headers=bob_headers,
+    )
+
+    assert alice_progress.status_code == 200
+    assert bob_progress.status_code == 200
+    assert alice_progress.json()["completed_days"] == 1
+    assert bob_progress.json()["completed_days"] == 0

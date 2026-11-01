@@ -9,6 +9,7 @@ A full-stack fitness tracking application built to help users record workouts, m
 - **Progress Analytics:** Track workout counts, sets, reps, and training volume.
 - **Progress Charts:** Visualize performance by exercise over time.
 - **Workout Calendar:** View training activity by date.
+- **Weekly Workout Goals:** Set a personalized goal of 1–7 workout days per week and track progress with a visual progress bar. Multiple exercises logged on the same day count as one workout day.
 - **AI Workout Recommendations:** Get workout insights and training suggestions.
 
 ## Technologies Used
@@ -25,12 +26,15 @@ A full-stack fitness tracking application built to help users record workouts, m
 - Connecting a Python application to PostgreSQL
 - Implementing create, read, update, and delete (CRUD) operations
 - Creating interactive charts and workout analytics
+- Implementing personalized weekly goals and progress tracking
 - Integrating AI-powered recommendations
+- Writing automated tests for API functionality and data isolation
 - Managing project files and version control with Git and GitHub
 
 ## Running the Project Locally
 
 ### Prerequisites
+
 - Python 3.13 or a compatible Python version
 - PostgreSQL
 - An OpenAI API key for AI-powered features
@@ -75,9 +79,9 @@ A full-stack fitness tracking application built to help users record workouts, m
 
 7. Open the dashboard in your browser:
 
-   http://127.0.0.1:8000/frontend/index.html
+   [http://127.0.0.1:8000/frontend/index.html](http://127.0.0.1:8000/frontend/index.html)
 
-   API documentation is available at http://127.0.0.1:8000/docs.
+   API documentation is available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
 ## Running Tests
 
@@ -87,7 +91,7 @@ Run the automated test suite with:
 python -m pytest -v
 ```
 
-The tests cover authentication, input validation, and user-specific workout data access.
+All 14 automated tests currently pass. The tests cover authentication, input validation, workout data isolation, weekly goal updates, invalid goal values, unique workout-day counting, and user-specific weekly progress.
 
 ## Security
 
@@ -100,5 +104,3 @@ The tests cover authentication, input validation, and user-specific workout data
 Kani Smith
 
 ## Dashboard Preview
-
-![AI Fitness Tracker Dashboard](fitness-dashboard.png)

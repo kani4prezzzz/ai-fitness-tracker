@@ -74,6 +74,35 @@
 
             </section>
 
+            <!-- Weekly Workout Goals -->
+            <section class="weekly-goals">
+
+                <h2>Weekly Workout Goal</h2>
+
+                <div class="card">
+                    <label for="weekly-goal">Set your weekly goal:</label>
+
+                    <select id="weekly-goal">
+                        <option value="1">1 day</option>
+                        <option value="2">2 days</option>
+                        <option value="3">3 days</option>
+                        <option value="4" selected>4 days</option>
+                        <option value="5">5 days</option>
+                        <option value="6">6 days</option>
+                        <option value="7">7 days</option>
+                </select>
+
+                <button id="save-weekly-goal">Save Goal</button>
+
+                <p id="weekly-goal-progress">Loading weekly progress...</p>
+
+                <progress id="weekly-progress-bar" value="0" max="100"></progress>
+
+                <p id="weekly-goal-message"></p>
+            </div>
+
+    </section>
+
             <!-- Add Workout -->
             <section class="add-workout">
 

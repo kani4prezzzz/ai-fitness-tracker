@@ -123,6 +123,8 @@ async function loadDashboard() {
 
         updateStats(workouts);
 
+        loadWeeklyGoal();
+
     } catch (error) {
 
         console.error(error);
@@ -134,6 +136,102 @@ async function loadDashboard() {
     }
 }
 
+// =========================
+// LOAD WEEKLY GOAL
+// =========================
+
+async function loadWeeklyGoal() {
+
+    try {
+
+        const token = localStorage.getItem("token");
+
+        const response = await fetch(
+            `${API_URL}/goals/weekly`,
+            {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error("Unable to load weekly goal");
+        }
+
+        const data = await response.json();
+
+        document.getElementById("weekly-goal").value =
+            data.weekly_goal;
+
+        document.getElementById("weekly-goal-progress").textContent =
+            `${data.completed_days} of ${data.weekly_goal} workout days completed`;
+
+        document.getElementById("weekly-progress-bar").value =
+            data.progress_percentage;
+
+        document.getElementById("weekly-goal-message").textContent =
+            data.remaining_days === 0
+                ? "Weekly goal completed! Great work!"
+                : `${data.remaining_days} more workout days to reach your goal.`;
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById("weekly-goal-progress").textContent =
+            "Unable to load weekly progress.";
+    }
+}
+
+// =========================
+// SAVE WEEKLY GOAL
+// =========================
+
+async function saveWeeklyGoal() {
+
+    try {
+
+        document.getElementById("weekly-goal-message").textContent =
+            "Saving your goal...";
+
+        const token = localStorage.getItem("token");
+
+        const weeklyGoal = Number(
+            document.getElementById("weekly-goal").value
+        );
+
+        const response = await fetch(
+            `${API_URL}/goals/weekly`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    weekly_goal: weeklyGoal
+                })
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error("Unable to save weekly goal");
+        }
+
+        document.getElementById("weekly-goal-message").textContent =
+            "Weekly goal saved successfully!";
+
+        await loadWeeklyGoal();
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById("weekly-goal-message").textContent =
+            "Unable to save weekly goal.";
+    }
+}
 
 // =========================
 // UPDATE STATISTICS
@@ -918,3 +1016,6 @@ document.getElementById("next-month").addEventListener(
         loadDashboard();
     }
 );
+
+document.getElementById("save-weekly-goal")
+    .addEventListener("click", saveWeeklyGoal);
