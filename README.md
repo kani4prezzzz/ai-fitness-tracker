@@ -104,3 +104,5 @@ All 14 automated tests currently pass. The tests cover authentication, input val
 Kani Smith
 
 ## Dashboard Preview
+
+![AI Fitness Tracker Dashboard](fitness-dashboard.png)
