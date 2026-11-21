@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, Float, ForeignKey, DateTime, Date
+from sqlalchemy import String, Integer, Float, ForeignKey, DateTime, Date, UniqueConstraint
 from datetime import date, datetime, timezone 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,6 +43,12 @@ class User(Base):
         nullable=False
     )
 
+    role: Mapped[str] = mapped_column(
+        String(20),
+        default="athlete",
+        nullable=False
+    )
+
     password_hash: Mapped[str] = mapped_column(
         String(255),
         nullable=False
@@ -56,4 +62,47 @@ class User(Base):
 
     workouts: Mapped[list["Workout"]] = relationship(
         back_populates="user"
+    )
+
+    teams: Mapped[list["Team"]] = relationship(
+        back_populates="coach"
+    )
+
+class Team(Base):
+    __tablename__ = "teams"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    invite_code: Mapped[str] = mapped_column(
+        String(20),
+        unique=True,
+        nullable=False
+    )
+    coach_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False
+    )
+    coach: Mapped["User"] = relationship(
+        back_populates="teams"
+    )
+
+class TeamMember(Base):
+    __tablename__ = "team_members"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    team_id: Mapped[int] = mapped_column(
+        ForeignKey("teams.id"),
+        nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "team_id"),
     )

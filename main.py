@@ -1,3 +1,4 @@
+import secrets
 from dotenv import load_dotenv
 import os
 
@@ -91,6 +92,23 @@ class LoginRequest(BaseModel):
 
 class WeeklyGoalUpdate(BaseModel):
     weekly_goal: int = Field(ge=1, le=7)
+
+class TeamCreate(BaseModel):
+    name: str
+
+class TeamJoin(BaseModel):
+    invite_code: str
+
+def require_coach(
+    current_user=Depends(get_current_user)
+):
+    if current_user.role != "coach":
+        raise HTTPException(
+            status_code=403,
+            detail="Only coaches can perform this action"
+        )
+
+    return current_user
 
 @app.post("/login")
 def login(
@@ -753,3 +771,96 @@ def update_workout(
     db.refresh(db_workout)
 
     return db_workout
+
+@app.post("/teams")
+def create_team(
+    team: TeamCreate,
+    db=Depends(get_db),
+    current_user=Depends(require_coach)
+):
+    invite_code = secrets.token_urlsafe(8)
+
+    db_team = models.Team(
+        name=team.name,
+        invite_code=invite_code,
+        coach_id=current_user.id
+    )
+
+    db.add(db_team)
+    db.commit()
+    db.refresh(db_team)
+
+    return {
+        "id": db_team.id,
+        "name": db_team.name,
+        "invite_code": db_team.invite_code,
+        "coach_id": db_team.coach_id
+    }
+
+@app.post("/teams/join")
+def join_team(
+    team_data: TeamJoin,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    team = db.query(models.Team).filter(
+        models.Team.invite_code == team_data.invite_code
+    ).first()
+
+    if team is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Team not found"
+        )
+
+    existing_member = db.query(models.TeamMember).filter(
+        models.TeamMember.user_id == current_user.id,
+        models.TeamMember.team_id == team.id
+    ).first()
+
+    if existing_member:
+        raise HTTPException(
+            status_code=400,
+            detail="You are already a member of this team"
+        )
+
+    membership = models.TeamMember(
+        user_id=current_user.id,
+        team_id=team.id
+    )
+
+    db.add(membership)
+    db.commit()
+
+    return {
+        "message": "Successfully joined team",
+        "team_name": team.name
+    }
+
+@app.get("/teams")
+def get_coach_teams(
+    db=Depends(get_db),
+    current_user=Depends(require_coach)
+):
+    teams = db.query(models.Team).filter(
+        models.Team.coach_id == current_user.id
+    ).all()
+
+    results = []
+
+    for team in teams:
+        athletes = db.query(models.User.username).join(
+            models.TeamMember,
+            models.TeamMember.user_id == models.User.id
+        ).filter(
+            models.TeamMember.team_id == team.id
+        ).all()
+
+        results.append({
+            "id": team.id,
+            "name": team.name,
+            "athletes": [athlete[0] for athlete in athletes],
+            "athlete_count": len(athletes)
+        })
+
+    return results
