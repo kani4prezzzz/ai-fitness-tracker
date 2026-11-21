@@ -99,6 +99,19 @@ class TeamCreate(BaseModel):
 class TeamJoin(BaseModel):
     invite_code: str
 
+class TeamWorkoutCreate(BaseModel):
+    exercise: str
+    sets: int
+    reps: int
+    target_weight: float | None = None
+    scheduled_date: date
+    notes: str | None = None
+
+class WorkoutCompletionCreate(BaseModel):
+    completed_sets: int
+    completed_reps: int
+    actual_weight: float | None = None
+
 def require_coach(
     current_user=Depends(get_current_user)
 ):
@@ -864,3 +877,201 @@ def get_coach_teams(
         })
 
     return results
+
+@app.post("/teams/{team_id}/workouts")
+def assign_team_workout(
+    team_id: int,
+    workout: TeamWorkoutCreate,
+    db=Depends(get_db),
+    current_user=Depends(require_coach)
+):
+    team = db.query(models.Team).filter(
+        models.Team.id == team_id,
+        models.Team.coach_id == current_user.id
+    ).first()
+
+    if team is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Team not found"
+        )
+
+    db_workout = models.TeamWorkout(
+        team_id=team.id,
+        exercise=workout.exercise,
+        sets=workout.sets,
+        reps=workout.reps,
+        target_weight=workout.target_weight,
+        scheduled_date=workout.scheduled_date,
+        notes=workout.notes
+    )
+
+    db.add(db_workout)
+    db.commit()
+    db.refresh(db_workout)
+
+    return {
+        "message": "Workout assigned successfully",
+        "workout_id": db_workout.id,
+        "team_name": team.name,
+        "exercise": db_workout.exercise
+    }
+
+@app.get("/teams/{team_id}/workouts")
+def get_team_workouts(
+    team_id: int,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    team = db.query(models.Team).filter(
+        models.Team.id == team_id
+    ).first()
+
+    if team is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Team not found"
+        )
+
+    is_coach = team.coach_id == current_user.id
+
+    is_member = db.query(models.TeamMember).filter(
+        models.TeamMember.team_id == team_id,
+        models.TeamMember.user_id == current_user.id
+    ).first()
+
+    if not is_coach and not is_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not a member of this team"
+        )
+
+    workouts = db.query(models.TeamWorkout).filter(
+        models.TeamWorkout.team_id == team_id
+    ).order_by(models.TeamWorkout.scheduled_date).all()
+
+    return [
+        {
+            "id": workout.id,
+            "exercise": workout.exercise,
+            "sets": workout.sets,
+            "reps": workout.reps,
+            "target_weight": workout.target_weight,
+            "scheduled_date": workout.scheduled_date,
+            "notes": workout.notes
+        }
+        for workout in workouts
+    ]
+
+@app.post("/team-workouts/{team_workout_id}/complete")
+def complete_team_workout(
+    team_workout_id: int,
+    completion: WorkoutCompletionCreate,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    team_workout = db.query(models.TeamWorkout).filter(
+        models.TeamWorkout.id == team_workout_id
+    ).first()
+
+    if team_workout is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Assigned workout not found"
+        )
+
+    membership = db.query(models.TeamMember).filter(
+        models.TeamMember.team_id == team_workout.team_id,
+        models.TeamMember.user_id == current_user.id
+    ).first()
+
+    if membership is None:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not a member of this team"
+        )
+
+    existing_completion = db.query(models.WorkoutCompletion).filter(
+        models.WorkoutCompletion.team_workout_id == team_workout_id,
+        models.WorkoutCompletion.user_id == current_user.id
+    ).first()
+
+    if existing_completion:
+        raise HTTPException(
+            status_code=400,
+            detail="You have already completed this workout"
+        )
+
+    db_completion = models.WorkoutCompletion(
+        team_workout_id=team_workout_id,
+        user_id=current_user.id,
+        completed_sets=completion.completed_sets,
+        completed_reps=completion.completed_reps,
+        actual_weight=completion.actual_weight
+    )
+
+    db.add(db_completion)
+    db.commit()
+    db.refresh(db_completion)
+
+    return {
+        "message": "Workout completed successfully",
+        "completion_id": db_completion.id,
+        "exercise": team_workout.exercise
+    }
+
+@app.get("/team-workouts/{team_workout_id}/completions")
+def get_workout_completions(
+    team_workout_id: int,
+    db=Depends(get_db),
+    current_user=Depends(require_coach)
+):
+    team_workout = db.query(models.TeamWorkout).join(
+        models.Team,
+        models.TeamWorkout.team_id == models.Team.id
+    ).filter(
+        models.TeamWorkout.id == team_workout_id,
+        models.Team.coach_id == current_user.id
+    ).first()
+
+    if team_workout is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Assigned workout not found"
+        )
+
+    athletes = db.query(models.User).join(
+        models.TeamMember,
+        models.TeamMember.user_id == models.User.id
+    ).filter(
+        models.TeamMember.team_id == team_workout.team_id
+    ).all()
+
+    completions = db.query(models.WorkoutCompletion).filter(
+        models.WorkoutCompletion.team_workout_id == team_workout_id
+    ).all()
+
+    completion_by_user = {
+        completion.user_id: completion
+        for completion in completions
+    }
+
+    results = []
+
+    for athlete in athletes:
+        completion = completion_by_user.get(athlete.id)
+
+        results.append({
+            "athlete": athlete.username,
+            "completed": completion is not None,
+            "completed_sets": completion.completed_sets if completion else None,
+            "completed_reps": completion.completed_reps if completion else None,
+            "actual_weight": completion.actual_weight if completion else None
+        })
+
+    return {
+        "exercise": team_workout.exercise,
+        "athlete_count": len(athletes),
+        "completed_count": len(completions),
+        "athletes": results
+    }
