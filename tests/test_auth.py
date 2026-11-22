@@ -505,3 +505,430 @@ def test_weekly_goal_progress_is_user_specific():
     assert bob_progress.status_code == 200
     assert alice_progress.json()["completed_days"] == 1
     assert bob_progress.json()["completed_days"] == 0
+
+def test_non_member_cannot_view_team_workouts():
+    # Register a coach and an athlete.
+    client.post(
+        "/users",
+        json={"username": "coach", "password": "StrongPass123"},
+    )
+
+    client.post(
+        "/users",
+        json={"username": "athlete", "password": "StrongPass123"},
+    )
+
+    # Change the coach's role from athlete to coach.
+    db = TestingSessionLocal()
+    coach = db.query(models.User).filter(
+        models.User.username == "coach"
+    ).first()
+
+    coach.role = "coach"
+    db.commit()
+    db.close()
+
+    # Log in as the coach and athlete.
+    coach_login = client.post(
+        "/login",
+        data={"username": "coach", "password": "StrongPass123"},
+    )
+
+    athlete_login = client.post(
+        "/login",
+        data={"username": "athlete", "password": "StrongPass123"},
+    )
+
+    coach_headers = {
+        "Authorization": f"Bearer {coach_login.json()['access_token']}"
+    }
+
+    athlete_headers = {
+        "Authorization": f"Bearer {athlete_login.json()['access_token']}"
+    }
+
+    # Coach creates a team.
+    team_response = client.post(
+        "/teams",
+        json={"name": "SEMO Track & Field"},
+        headers=coach_headers,
+    )
+
+    assert team_response.status_code == 200
+    team_id = team_response.json()["id"]
+
+    # Coach assigns a workout to the team.
+    workout_response = client.post(
+        f"/teams/{team_id}/workouts",
+        json={
+            "exercise": "Squat",
+            "sets": 4,
+            "reps": 8,
+            "target_weight": 185,
+            "scheduled_date": "2026-11-22",
+            "notes": "Focus on form",
+        },
+        headers=coach_headers,
+    )
+
+    assert workout_response.status_code == 200
+
+    # Athlete tries to view workouts without joining the team.
+    response = client.get(
+        f"/teams/{team_id}/workouts",
+        headers=athlete_headers,
+    )
+
+    # Access should be denied.
+    assert response.status_code == 403
+
+def test_team_member_can_view_team_workouts():
+    # Register a coach and an athlete.
+    client.post(
+        "/users",
+        json={"username": "coach2", "password": "StrongPass123"},
+    )
+
+    client.post(
+        "/users",
+        json={"username": "athlete2", "password": "StrongPass123"},
+    )
+
+    # Change the coach's role to coach.
+    db = TestingSessionLocal()
+    coach = db.query(models.User).filter(
+        models.User.username == "coach2"
+    ).first()
+
+    coach.role = "coach"
+    db.commit()
+    db.close()
+
+    # Log in as the coach and athlete.
+    coach_login = client.post(
+        "/login",
+        data={"username": "coach2", "password": "StrongPass123"},
+    )
+
+    athlete_login = client.post(
+        "/login",
+        data={"username": "athlete2", "password": "StrongPass123"},
+    )
+
+    coach_headers = {
+        "Authorization": f"Bearer {coach_login.json()['access_token']}"
+    }
+
+    athlete_headers = {
+        "Authorization": f"Bearer {athlete_login.json()['access_token']}"
+    }
+
+    # Coach creates a team.
+    team_response = client.post(
+        "/teams",
+        json={"name": "SEMO Track & Field"},
+        headers=coach_headers,
+    )
+
+    assert team_response.status_code == 200
+    team_id = team_response.json()["id"]
+    invite_code = team_response.json()["invite_code"]
+
+    # Athlete joins the team using the invite code.
+    join_response = client.post(
+        "/teams/join",
+        json={"invite_code": invite_code},
+        headers=athlete_headers,
+    )
+
+    assert join_response.status_code == 200
+
+    # Coach assigns a workout to the team.
+    workout_response = client.post(
+        f"/teams/{team_id}/workouts",
+        json={
+            "exercise": "Bench Press",
+            "sets": 3,
+            "reps": 10,
+            "target_weight": 135,
+            "scheduled_date": "2026-11-22",
+            "notes": "Control the movement",
+        },
+        headers=coach_headers,
+    )
+
+    assert workout_response.status_code == 200
+
+    # Athlete views the team's assigned workouts.
+    response = client.get(
+        f"/teams/{team_id}/workouts",
+        headers=athlete_headers,
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["exercise"] == "Bench Press"
+
+def test_athlete_cannot_assign_team_workouts():
+    # Register a coach and an athlete.
+    client.post(
+        "/users",
+        json={"username": "coach3", "password": "StrongPass123"},
+    )
+
+    client.post(
+        "/users",
+        json={"username": "athlete3", "password": "StrongPass123"},
+    )
+
+    # Change the coach's role to coach.
+    db = TestingSessionLocal()
+    coach = db.query(models.User).filter(
+        models.User.username == "coach3"
+    ).first()
+
+    coach.role = "coach"
+    db.commit()
+    db.close()
+
+    # Log in as the coach and athlete.
+    coach_login = client.post(
+        "/login",
+        data={"username": "coach3", "password": "StrongPass123"},
+    )
+
+    athlete_login = client.post(
+        "/login",
+        data={"username": "athlete3", "password": "StrongPass123"},
+    )
+
+    coach_headers = {
+        "Authorization": f"Bearer {coach_login.json()['access_token']}"
+    }
+
+    athlete_headers = {
+        "Authorization": f"Bearer {athlete_login.json()['access_token']}"
+    }
+
+    # Coach creates a team.
+    team_response = client.post(
+        "/teams",
+        json={"name": "SEMO Track & Field"},
+        headers=coach_headers,
+    )
+
+    assert team_response.status_code == 200
+    team_id = team_response.json()["id"]
+
+    # Athlete tries to assign a workout.
+    response = client.post(
+        f"/teams/{team_id}/workouts",
+        json={
+            "exercise": "Squat",
+            "sets": 4,
+            "reps": 8,
+            "target_weight": 185,
+            "scheduled_date": "2026-11-22",
+            "notes": "Test workout",
+        },
+        headers=athlete_headers,
+    )
+
+    assert response.status_code == 403
+
+def test_athlete_can_complete_assigned_workout():
+    # Register a coach and an athlete.
+    client.post(
+        "/users",
+        json={"username": "coach4", "password": "StrongPass123"},
+    )
+
+    client.post(
+        "/users",
+        json={"username": "athlete4", "password": "StrongPass123"},
+    )
+
+    # Change the coach's role to coach.
+    db = TestingSessionLocal()
+    coach = db.query(models.User).filter(
+        models.User.username == "coach4"
+    ).first()
+
+    coach.role = "coach"
+    db.commit()
+    db.close()
+
+    # Log in as the coach and athlete.
+    coach_login = client.post(
+        "/login",
+        data={"username": "coach4", "password": "StrongPass123"},
+    )
+
+    athlete_login = client.post(
+        "/login",
+        data={"username": "athlete4", "password": "StrongPass123"},
+    )
+
+    coach_headers = {
+        "Authorization": f"Bearer {coach_login.json()['access_token']}"
+    }
+
+    athlete_headers = {
+        "Authorization": f"Bearer {athlete_login.json()['access_token']}"
+    }
+
+    # Coach creates a team.
+    team_response = client.post(
+        "/teams",
+        json={"name": "SEMO Track & Field"},
+        headers=coach_headers,
+    )
+
+    assert team_response.status_code == 200
+    team_id = team_response.json()["id"]
+    invite_code = team_response.json()["invite_code"]
+
+    # Athlete joins the team.
+    join_response = client.post(
+        "/teams/join",
+        json={"invite_code": invite_code},
+        headers=athlete_headers,
+    )
+
+    assert join_response.status_code == 200
+
+    # Coach assigns a workout.
+    workout_response = client.post(
+        f"/teams/{team_id}/workouts",
+        json={
+            "exercise": "Squat",
+            "sets": 4,
+            "reps": 8,
+            "target_weight": 185,
+            "scheduled_date": "2026-11-22",
+            "notes": "Focus on form",
+        },
+        headers=coach_headers,
+    )
+
+    assert workout_response.status_code == 200
+    workout_id = workout_response.json()["workout_id"]
+
+    # Athlete marks the assigned workout as completed.
+    response = client.post(
+        f"/team-workouts/{workout_id}/complete",
+        json={
+            "completed_sets": 4,
+            "completed_reps": 8,
+            "actual_weight": 175,
+        },
+        headers=athlete_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Workout completed successfully"
+
+def test_athlete_cannot_complete_same_workout_twice():
+    # Register a coach and an athlete.
+    client.post(
+        "/users",
+        json={"username": "coach5", "password": "StrongPass123"},
+    )
+
+    client.post(
+        "/users",
+        json={"username": "athlete5", "password": "StrongPass123"},
+    )
+
+    # Change the coach's role to coach.
+    db = TestingSessionLocal()
+    coach = db.query(models.User).filter(
+        models.User.username == "coach5"
+    ).first()
+
+    coach.role = "coach"
+    db.commit()
+    db.close()
+
+    # Log in as the coach and athlete.
+    coach_login = client.post(
+        "/login",
+        data={"username": "coach5", "password": "StrongPass123"},
+    )
+
+    athlete_login = client.post(
+        "/login",
+        data={"username": "athlete5", "password": "StrongPass123"},
+    )
+
+    coach_headers = {
+        "Authorization": f"Bearer {coach_login.json()['access_token']}"
+    }
+
+    athlete_headers = {
+        "Authorization": f"Bearer {athlete_login.json()['access_token']}"
+    }
+
+    # Coach creates a team.
+    team_response = client.post(
+        "/teams",
+        json={"name": "SEMO Track & Field"},
+        headers=coach_headers,
+    )
+
+    assert team_response.status_code == 200
+    team_id = team_response.json()["id"]
+    invite_code = team_response.json()["invite_code"]
+
+    # Athlete joins the team.
+    join_response = client.post(
+        "/teams/join",
+        json={"invite_code": invite_code},
+        headers=athlete_headers,
+    )
+
+    assert join_response.status_code == 200
+
+    # Coach assigns a workout.
+    workout_response = client.post(
+        f"/teams/{team_id}/workouts",
+        json={
+            "exercise": "Bench Press",
+            "sets": 3,
+            "reps": 10,
+            "target_weight": 135,
+            "scheduled_date": "2026-11-22",
+            "notes": "Test workout",
+        },
+        headers=coach_headers,
+    )
+
+    assert workout_response.status_code == 200
+    workout_id = workout_response.json()["workout_id"]
+
+    # Athlete completes the assigned workout.
+    first_response = client.post(
+        f"/team-workouts/{workout_id}/complete",
+        json={
+            "completed_sets": 3,
+            "completed_reps": 10,
+            "actual_weight": 135,
+        },
+        headers=athlete_headers,
+    )
+
+    assert first_response.status_code == 200
+
+    # Athlete tries to complete the same workout again.
+    second_response = client.post(
+        f"/team-workouts/{workout_id}/complete",
+        json={
+            "completed_sets": 3,
+            "completed_reps": 10,
+            "actual_weight": 135,
+        },
+        headers=athlete_headers,
+    )
+
+    assert second_response.status_code == 400
+
