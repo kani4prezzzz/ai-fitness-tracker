@@ -3,6 +3,7 @@ const API_URL = "http://127.0.0.1:8000";
 const loginButton = document.getElementById("login-button");
 const loginMessage = document.getElementById("login-message");
 const dashboard = document.getElementById("dashboard");
+const coachDashboard = document.getElementById("coach-dashboard");
 
 loginButton.addEventListener("click", login);
 
@@ -63,12 +64,42 @@ async function login() {
             data.access_token
         );
 
+        const userResponse = await fetch(
+            `${API_URL}/users/me`,
+            {
+                headers: {
+                    "Authorization": `Bearer ${data.access_token}`
+                }
+            }
+        );
+
+        if (!userResponse.ok) {
+            throw new Error("Unable to get user information.");
+        }
+
+        const user = await userResponse.json();
+
+        localStorage.setItem("role", user.role);
+        console.log("Logged-in user:", user);
+
         loginMessage.textContent =
-            "Login successful!";
+             `Login successful! Role: ${user.role}`;
 
-        dashboard.style.display = "block";
+        if (user.role === "coach") {
 
-        await loadDashboard();
+            dashboard.style.display = "none";
+            coachDashboard.style.display = "block";
+
+            await loadCoachDashboard();
+
+        } else {
+
+            coachDashboard.style.display = "none";
+            dashboard.style.display = "block";
+
+            await loadDashboard();
+
+        }
 
     } catch (error) {
 
@@ -647,8 +678,22 @@ async function addWorkout() {
             document.getElementById("weight").value
         );
 
-    const workoutDate =
-        document.getElementById("workout-date").value;
+    const dateInput = document.getElementById("coach-workout-date");
+
+    dateInput.onchange = function() {
+        alert("New date: " + this.value);
+    };
+
+    dateInput.addEventListener("change", () => {
+        console.log("Date changed to:", dateInput.value);
+    });
+
+    console.log("Date input:", dateInput);
+    console.log("Date value:", dateInput.value);
+
+    const workoutDate = dateInput.value;
+
+    alert("Date value: [" + workoutDate + "]");
 
     if (
         !exercise ||
@@ -1019,3 +1064,294 @@ document.getElementById("next-month").addEventListener(
 
 document.getElementById("save-weekly-goal")
     .addEventListener("click", saveWeeklyGoal);
+
+
+// =========================
+// COACH DASHBOARD
+// =========================
+
+async function loadCoachDashboard() {
+
+    const token = localStorage.getItem("token");
+
+    const response = await fetch(
+        `${API_URL}/teams`,
+        {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Unable to load teams.");
+    }
+
+    const teams = await response.json();
+
+    const teamsContainer =
+        document.getElementById("coach-teams");
+
+    teamsContainer.innerHTML = "";
+
+    if (teams.length === 0) {
+        teamsContainer.textContent =
+            "You haven't created any teams yet.";
+        return;
+    }
+
+    teams.forEach(team => {
+
+        const teamCard = document.createElement("div");
+
+        teamCard.innerHTML = `
+            <h4>${team.name}</h4>
+            <p>Athletes: ${team.athlete_count}</p>
+            <p>Members: ${team.athletes.join(", ")}</p>
+            <button>View Team</button>
+        `;
+
+teamCard.querySelector("button").addEventListener("click", () => {
+    viewTeam(team.id);
+});
+
+        teamsContainer.appendChild(teamCard);
+
+    });
+}
+
+
+async function viewTeam(teamId) {
+
+    const token = localStorage.getItem("token");
+
+    const response = await fetch(
+        `${API_URL}/teams/${teamId}/workouts`,
+        {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Unable to load team workouts.");
+    }
+
+    const workouts = await response.json();
+
+    const detailsContainer =
+        document.getElementById("team-details");
+
+    detailsContainer.innerHTML = `
+        <h3>Team Workouts</h3>
+
+        <h3>Assign New Workout</h3>
+
+        <form id="assign-workout-form">
+
+            <input type="text" id="workout-exercise"
+                placeholder="Exercise name" required>
+
+            <input type="number" id="workout-sets"
+                placeholder="Sets" min="1" required>
+
+            <input type="number" id="workout-reps"
+                placeholder="Reps" min="1" required>
+
+            <input type="number" id="workout-weight"
+                placeholder="Target weight (lbs)" min="0" required>
+
+            <input
+                type="text"
+                id="coach-workout-date"
+                placeholder="YYYY-MM-DD"
+                required
+            >
+
+            <textarea id="workout-notes"
+                placeholder="Workout notes (optional)"></textarea>
+
+            <button type="submit">Assign Workout</button>
+
+        </form>
+    `;
+
+const dateInput = document.getElementById("coach-workout-date");
+
+const today = new Date();
+
+const localDate = new Date(
+    today.getTime() - today.getTimezoneOffset() * 60000
+).toISOString().split("T")[0];
+
+if (!dateInput.value) {
+    dateInput.value = localDate;
+}
+
+dateInput.addEventListener("input", () => {
+    console.log("Date picker input:", dateInput.value);
+});
+
+console.log("Date after defaulting:", dateInput.value);
+
+    // Handle workout assignment
+    const assignForm =
+        document.getElementById("assign-workout-form");
+
+    assignForm.addEventListener("submit", async (event) => {
+
+        event.preventDefault();
+
+        const dateElement = document.getElementById("coach-workout-date");
+
+        const workoutDate = dateElement.value;
+
+        alert("Displayed date: " + dateElement.value);
+
+        if (!workoutDate) {
+            alert("Please select a workout date.");
+            return;
+        }
+
+        const workoutData = {
+            exercise: document.getElementById("workout-exercise").value,
+            sets: Number(document.getElementById("workout-sets").value),
+            reps: Number(document.getElementById("workout-reps").value),
+            target_weight: Number(document.getElementById("workout-weight").value),
+            scheduled_date: workoutDate,
+            notes: document.getElementById("workout-notes").value
+        };
+
+        const assignResponse = await fetch(
+            `${API_URL}/teams/${teamId}/workouts`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(workoutData)
+            }
+        );
+
+        if (!assignResponse.ok) {
+            const errorDetails = await assignResponse.text();
+
+            alert("Error: " + errorDetails);
+
+            console.log("Assignment error:", errorDetails);
+
+            return;
+        }
+
+        alert("Workout assigned successfully!");
+
+        await viewTeam(teamId);
+
+    });
+
+    // Display assigned workouts
+    if (workouts.length === 0) {
+        const message = document.createElement("p");
+        message.textContent = "This team has no assigned workouts yet.";
+        detailsContainer.appendChild(message);
+        return;
+    }
+
+    for (const workout of workouts) {
+
+        const workoutCard = document.createElement("div");
+
+        workoutCard.innerHTML = `
+            <h4>${workout.exercise}</h4>
+            <p>Target: ${workout.sets} sets x ${workout.reps} reps</p>
+            <p>Scheduled Date: ${workout.scheduled_date}</p>
+            <p>Loading completion status...</p>
+        `;
+
+        detailsContainer.appendChild(workoutCard);
+
+        const deleteButton = document.createElement("button");
+
+    deleteButton.textContent = "Delete Assignment";
+
+    deleteButton.style.backgroundColor = "#dc2626";
+    deleteButton.style.color = "white";
+    deleteButton.style.border = "none";
+    deleteButton.style.padding = "8px 12px";
+    deleteButton.style.borderRadius = "6px";
+    deleteButton.style.cursor = "pointer";
+
+    deleteButton.addEventListener("click", async () => {
+
+        const confirmed = confirm(
+            `Are you sure you want to delete ${workout.exercise}?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const deleteResponse = await fetch(
+            `${API_URL}/team-workouts/${workout.id}`,
+            {
+                method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+            }
+        }
+    );
+
+    if (!deleteResponse.ok) {
+        alert("Unable to delete workout.");
+        return;
+    }
+
+    alert("Workout assignment deleted!");
+
+    await viewTeam(teamId);
+});
+
+workoutCard.appendChild(deleteButton);
+
+        const completionResponse = await fetch(
+            `${API_URL}/team-workouts/${workout.id}/completions`,
+            {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            }
+        );
+
+        if (!completionResponse.ok) {
+            throw new Error("Unable to load completion status.");
+        }
+
+        const completionData = await completionResponse.json();
+
+        const status = document.createElement("div");
+
+        status.innerHTML = `
+            <p>Completed: ${completionData.completed_count} / ${completionData.athlete_count}</p>
+        `;
+
+        completionData.athletes.forEach(athlete => {
+
+            const athleteInfo = document.createElement("p");
+
+            if (athlete.completed) {
+                athleteInfo.textContent =
+                    `${athlete.athlete}: Completed - ${athlete.completed_sets} sets x ${athlete.completed_reps} reps at ${athlete.actual_weight} lbs`;
+            } else {
+                athleteInfo.textContent =
+                    `${athlete.athlete}: Not completed`;
+            }
+
+            status.appendChild(athleteInfo);
+
+        });
+
+        workoutCard.appendChild(status);
+    }
+}

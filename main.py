@@ -81,6 +81,16 @@ def get_current_user(
             detail="User not found"
         )
     return user
+
+@app.get("/users/me")
+def read_current_user(
+    current_user=Depends(get_current_user)
+):
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "role": current_user.role
+    }
     
 class UserCreate(BaseModel):
     username: str
@@ -1074,4 +1084,35 @@ def get_workout_completions(
         "athlete_count": len(athletes),
         "completed_count": len(completions),
         "athletes": results
+    }
+
+@app.delete("/team-workouts/{team_workout_id}")
+def delete_team_workout(
+    team_workout_id: int,
+    db=Depends(get_db),
+    current_user=Depends(require_coach)
+):
+    team_workout = db.query(models.TeamWorkout).join(
+        models.Team,
+        models.TeamWorkout.team_id == models.Team.id
+    ).filter(
+        models.TeamWorkout.id == team_workout_id,
+        models.Team.coach_id == current_user.id
+    ).first()
+
+    if team_workout is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Assigned workout not found"
+        )
+
+    db.query(models.WorkoutCompletion).filter(
+        models.WorkoutCompletion.team_workout_id == team_workout_id
+    ).delete(synchronize_session=False)
+
+    db.delete(team_workout)
+    db.commit()
+
+    return {
+        "message": "Assigned workout deleted successfully"
     }
